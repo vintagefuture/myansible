@@ -1,0 +1,5 @@
+webservers:
+  hosts:
+    myservers:
+      ansible_host: 192.168.0.167
+      http_port: 80
