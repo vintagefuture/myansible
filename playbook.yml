@@ -42,6 +42,8 @@
         name:
           - ca-certificates
           - curl
+          - nfs-commons
+          - avahi-daemon
         state: present
 
     - name: Create directory for Docker keyrings
