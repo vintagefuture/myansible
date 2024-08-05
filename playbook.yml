@@ -16,6 +16,9 @@
     netplan_config_file: /etc/netplan/01-netcfg.yaml
 
   tasks:
+    - name: Set a hostname
+      ansible.builtin.hostname:
+        name: pihub
     - name: Ensure user exists
       user:
         name: "{{ user_name }}"
@@ -103,6 +106,4 @@
       command: netplan apply
 
     - name: Restart the system
-      reboot:
-        msg: "Reboot initiated by Ansible for final configuration."
-        timeout: 60
+      ansible.builtin.reboot:
