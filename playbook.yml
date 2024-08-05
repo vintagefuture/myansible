@@ -1,5 +1,5 @@
 ---
-- name: Set up Raspberry Pi 4 with Ubuntu Server
+- name: Set up pihub server on Ubuntu server
   hosts: raspberrypi
   become: yes
 
