@@ -1,44 +1,108 @@
 ---
-- hosts: all
-  become: true
+- name: Set up Raspberry Pi 4 with Ubuntu Server
+  hosts: raspberrypi
+  become: yes
+
+  vars:
+    user_name: nedo
+    user_password: rutles
+    fstab_entries:
+      - "truenas.local:/mnt/MyMagicNAS/media/Movies	/media/Movies	nfs auto,nofail,noatime,nolock,intr,tcp,actimeo=1800 0 0"
+      - "truenas.local:/mnt/MyMagicNAS/media/Series	/media/Series	nfs auto,nofail,noatime,nolock,intr,tcp,actimeo=1800 0 0"
+      - "/dev/sda2	/media/downloads	ext4	auto,nofail  0 0"
+    docker_repo_url: https://download.docker.com/linux/ubuntu
+    docker_gpg_key: https://download.docker.com/linux/ubuntu/gpg
+    static_ip: 192.168.0.91
+    netplan_config_file: /etc/netplan/01-netcfg.yaml
 
   tasks:
-    - name: Install aptitude
-      apt:
-        name: aptitude
-        state: latest
-        update_cache: true
+    - name: Ensure user exists
+      user:
+        name: "{{ user_name }}"
+        password: "{{ user_password | password_hash('sha512') }}"
+        state: present
+        shell: /bin/bash
 
-    - name: Install required system packages
+    - name: Add lines to /etc/fstab
+      lineinfile:
+        path: /etc/fstab
+        line: "{{ item }}"
+        state: present
+      loop: "{{ fstab_entries }}"
+
+    - name: Update APT cache
       apt:
-        pkg:
-          - apt-transport-https
+        update_cache: yes
+
+    - name: Install dependencies for Docker
+      apt:
+        name:
           - ca-certificates
           - curl
-          - software-properties-common
-          - python3-pip
-          - virtualenv
-          - python3-setuptools
-        state: latest
-        update_cache: true
-
-    - name: Add Docker GPG apt Key
-      apt_key:
-        url: https://download.docker.com/linux/ubuntu/gpg
         state: present
 
-    - name: Add Docker Repository
-      apt_repository:
-        repo: deb https://download.docker.com/linux/ubuntu focal stable
-        state: present
+    - name: Create directory for Docker keyrings
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
 
-    - name: Update apt and install docker-ce
+    - name: Add Docker's official GPG key
+      get_url:
+        url: "{{ docker_gpg_key }}"
+        dest: /etc/apt/keyrings/docker.asc
+        mode: '0644'
+
+    - name: Add Docker repository
+      shell: |
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] {{ docker_repo_url }} $(. /etc/os-release && echo \"$VERSION_CODENAME\") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+      args:
+        executable: /bin/bash
+
+    - name: Update APT cache after adding Docker repository
       apt:
-        name: docker-ce
-        state: latest
-        update_cache: true
+        update_cache: yes
 
-    - name: Install Docker Module for Python
-      pip:
-        name: docker
+    - name: Install Docker packages
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
 
+    - name: Add user to docker group
+      user:
+        name: "{{ user_name }}"
+        groups: docker
+        append: yes
+
+    - name: Configure static IP address
+      copy:
+        content: |
+          network:
+            version: 2
+            renderer: networkd
+            ethernets:
+              eth0:
+                addresses:
+                  - {{ static_ip }}/24
+                routes:
+                  - to: default
+                    via: 192.168.0.1
+                nameservers:
+                  addresses: [8.8.8.8, 1.1.1.1]
+        dest: "{{ netplan_config_file }}"
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Apply Netplan configuration
+      command: netplan apply
+
+    - name: Restart the system
+      reboot:
+        msg: "Reboot initiated by Ansible for final configuration."
+        timeout: 60
