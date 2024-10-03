@@ -1,0 +1,12 @@
+# minimal configuration
+base-url: "http://ntfy.542646.xyz"
+cache-file: "/var/cache/ntfy/cache.db"
+attachment-cache-dir: "/var/cache/ntfy/attachments"
+listen-http: ":32770"
+
+# enable authentication (needs to be followed by sudo ntfy user add --role=admin <user>)
+auth-file: "/var/lib/ntfy/user.db"
+auth-default-access: "deny-all"
+
+# to make iOS notifications work
+upstream-base-url: "https://ntfy.sh"
